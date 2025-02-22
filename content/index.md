@@ -1,5 +1,6 @@
 ---
-title: Welcome to Quartz
+title: Blog
 ---
 
-C++/分布式存储/算法竞赛
+天坑硕士在读，喜欢CS知识并在学习中
+主要学习C++/分布式存储/算法竞赛相关知识
