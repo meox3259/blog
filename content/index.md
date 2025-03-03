@@ -2,6 +2,8 @@
 title: Blog
 ---
 
-天坑硕士在读，喜欢CS知识并在学习中
+I obtained my bachelor’s degree from Dalian University of Technologyand. Currently, I'm persuing my master’s degree at The University of Tokyo. 
 
-主要学习C++/分布式存储/算法竞赛相关知识
+Used to be intern in infrastructure @Kwai Beijing
+
+ICPC/CCPC gold medalist
