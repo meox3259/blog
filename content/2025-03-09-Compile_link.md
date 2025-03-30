@@ -10,6 +10,8 @@ tags:
 
 链接可以将大型项目分解成小部分，每次修改只用重新编译修改的模块，再重新链接即可。
 
+本文是针对CSAPP链接以及自己手动实验的学习。
+
 # 链接步骤
 
 ## 生成中间文件.i
@@ -109,10 +111,36 @@ ELF（Executable and Linkable Format）主要包含以下4种文件
 包含以下字段
 - Magic: 如下图所示
 ![Magic Number](https://im.gurl.eu.org/file/AgACAgEAAxkDAAI2GWfNy81AAtt9wTp3aANFiYiUHhfBAAIZrTEbloRwRjv0ThFXKcO4AQADAgADeQADNgQ.png)
-- Class：表示文件采用的地址位宽，ELF64表示位宽64位。
-- Data：指定数据编码方式，这里表示2进制补码，且采用小端（低位在前）。
-- Version：采用的ELF格式版本号。
-- OS/ABI：
+- Class：表示文件采用的地址位宽，ELF64表示位宽64位，对应`e_ident[EI_CLASS]。
+- Data：指定数据编码方式，这里表示2进制补码，且采用小端（低位在前），对应`e_ident[data]`。
+- Version：采用的ELF格式版本号，对应`e_ident[EI_VERSION]`。
+- OS/ABI：目标操作系统和ABI类型，此处为`V`，对应`e_ident[EI_OSABI]`。
+- ABI Version：ABI版本，通常为0，对应
+- Type：文件类型，此处为可重定位文件.o，对应`e_type`
+- Machine：目标CPU架构，此处为`x86_64`，对应`e_machine`字段
+- Version：文件版本，通常与上文的`Version`一致，此处为`1`
+- Entry point address：程序入口地址，由于可重定位文件无入口点，此处为`0`
+- Start of program headers：节头表的偏移量，此处为`616`
+- Flag：处理器特定标志，此处为`0`
+- Size of this header：ELF头大小，此处为64字节（ELF64标准）
+- Size of program headers：程序头表大小，此处为`0`，表示无
+- Number of program header：程序头表条目数量，此处为`0`
+- Size of section headers：节头表每个条目的大小，此处为`64 Byte`
+- Number of section headers：节头表包含的条目数，此处为`14`
+- Section header string table index：节头表中字符串索引为`13`，即第`14`个节头
+
+ELF中的Section：
+- .text：已编译的机器码
+- .rodata：只读数据，比如printf语句中的格式串和开关语句跳转表
+- .data：已初始化的全局和静态C变量。局部C变量在运行时被保存在栈中，既不出现在.data节中，也不出现在.bss节中
+- .bss：未初始化/已初始化为0的全局或静态变量，在目标文件中仅仅是一个占位符，不占用空间。运行时，在内存中分配这些变量，初始值为0
+- .symtab：一个符号表，它存放在程序中定义和引用的函数和全局变量的信息。每个可重定位目标文件在.symtab中都有一张符号表，但是和编译器中的符号表不同，.symtab中不包含局部变量的条目
+- .rel.text：一个.text节中位置的列表，当链接器把这个目标文件和其他文件组合时，需要修改这些位置。对于可执行文件，由于不需要重定位信息，因此通常省略
+- .rel.data：被模块引用或定义的所有全局变量的重定位信息
+- .debug：一个调试符号表，保存了调试的信息，需要通过`-g`生成
+	- 变量名、类型、作用域、内存地址
+	- 函数名、参数类型、返回值类型、入口地址
+	- 结构体、枚举等复杂类型的信息
 
 
 
