@@ -1,5 +1,5 @@
 ---
-title: 深入理解分布式系统
+title: 分布式系统基础（一）
 draft: false
 tags:
   - 分布式存储
