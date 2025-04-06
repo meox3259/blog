@@ -1,5 +1,5 @@
 ---
-title: RocksDB - MANIFEST
+title: RocksDB - SSTable
 draft: false
 tags:
   - C++
