@@ -91,8 +91,115 @@ $$\tau = E[J(X_i,X_j)] \geq \frac{1-2\delta_{G}}{1+2\delta_{G}} \cdot \frac{1}{2
 
 
 ## SD extension
-这里松弛限制，假设$|G_i|=|G_j|=n$。这里尝试向左右扩展$G_i$和$G_j$，直到winnowed MinHash的期望$\leq \tau$。停止条件是达到了SD大小上限，或者显著的相交了。
+到目前为止，我们假设`n`的值是固定的，并且$n = |G_i| = |G_j|$。  
+现在我们取消这一限制，并尝试在两个方向上尽可能地扩展任意一个种子 SD，以确保能够找到“真实” SD 的边界。
+
+这种扩展可以通过逐步增加`n`和`m`的值来实现（每步花费$O(log\ s)$的时间），其本质是不断扩展集合$W(X_i)$ 和 $W(X_j)$：  
+对于任何出现在位置`i + n + 1`和`j + m + 1`的 minimizer，都将其加入有序集合`L`中。
+
+这里我们使用了与前面步骤（见第 3.4 节）相同的数据结构，并持续扩展`SD`区域，直到 **winnowed MinHash** 估计值低于阈值$\tau$。
+
+---
+
+如果`n` 和 `m` 都变得过大，我们也会终止扩展（我们在 `SEDEF` 中限制 `SD` 最多为 `1 Mbp` 长度，参考 `WGAC`）。
+
+注意以下几点：
+
+- 项 $|S(W(X_i) \cup W(X_j))|$ 会不断增长；
+- 而 $|S(W(X_i) \cap W(X_j))|$ 会在两个区域不再相似时保持不变；
+- 这会逐步降低 **Jaccard 相似度估计值**。
+
+---
+
+我们还会在字符串 $G_i$ 和 $G_j$ 开始发生重叠时中止扩展。  
+值得注意的是，我们也可以**反向执行**该扩展过程，即通过逐步减小`i`和`j`的值，并应用相同的技术进行处理。
+
+最终，我们报告所有 **MinHash 估计值大于** $\tau$ 的最大$G_i$和$G_j$。
+
+同时考虑利用`q gram`优化这个过程：对于任意两个基因组片段$G_i$和$G_j$，若其编辑错误率低于$\delta$且满足`SD`的错误模型，则它们至少共享$n(1-\delta_{G}-q\delta_{M})-(np_G+1) \cdot (q+1)$个`q gram`，其中$p_{G}$是1个base pair的期望对应gap数，这个修改使得我们针对给定的$p_G$值，无损地排除所有不满足`SD`误差模型的子串对$(G_i, G_j)$。
+
+通过上述算法对整个人类基因组进行分析时，由于基因组中存在大量小重复序列，会产生超过5亿个潜在SD区域。为缓解这一问题，我们在种子SD检测过程中仅使用包含至少一个非重复屏蔽核苷酸 的k-mer。同时，为了允许进化过程中重复序列插入SD的情况，SD扩展步骤会利用所有可用k-mer进行种子扩展。最后，我们通过为每个潜在SD区域填充预定义数量的碱基（与潜在区域大小相关的函数）来进一步提高在目标区域内定位大型SD的概率。
 
 ## SD chaining
-最后对之前获取的潜在的SD区域，进行local chain和是sparse dynamic programming进行确定最终区域。
+在确定潜在的SD区域后，我们枚举所有满足SD标准的局部比对（长度为1000）。为了高效完成这一任务，SEDEF采用了一种两级局部链算法，类似于Abouelhoda和Ohlebusch（2003）及Myers和Miller（1995）提出的方法。第一阶段，我们使用种子扩展法构建匹配种子列表（种子长度≥11），并通过Abouelhoda和Ohlebusch（2003）及Myers和Miller（1995）描述的O(nlog n)稀疏动态规划算法，寻找由这些种子形成的最长链。在此步骤中，我们将种子间的最大间隙限制为l·δ_G，以尽可能紧密地聚类种子。找到这些初始链（可能跨度<1000bp）后，我们通过允许更大的间隙进一步优化它们，形成较大的最终链。为了与WGAC兼容（其允许SD内的任意大间隙且不惩罚间隙延伸），我们在构建SD链时采用仿射缺口罚分；然而，为避免低质量比对，我们将间隙限制为不超过10000bp。链式比对与全局比对结合进行，后者通过KSW2库实现，该库利用单指令多数据流（SIMD）并行化技术（通过流式SIMD扩展指令集SSE）加速全局序列比对（Li, 2017）。重要的是，我们以标准BEDPE格式报告所有比对结果，并附带对应的CIGAR格式编辑字符串（Li et al., 2009），以及其他类似WGAC的有用指标，如Kimura双参数遗传距离（Kimura和Ohta, 1972）和Jukes-Cantor距离（Jukes和Cantor, 1969）。   
 
+在实验中，我们为种子阶段和链式阶段分别设置k=12和k=11（注：此参数可由用户配置）。虽然较小的k值可能提升灵敏度，但我们发现这种改进微乎其微，不值得增加运行时间。另一方面，较大的k值虽能缩短运行时间，但会降低灵敏度。 
+
+
+# 程序
+这个程序写的比较有意思，把几个步骤通过命令行传到可执行程序里，然后用脚本串起来流程。
+
+## samtools 
+会创建一个有关`.fa`文件的元数据
+
+执行
+```bash
+samtools faidx test2.fa 
+```
+
+生成了这样的格式
+
+```bash
+ref|NC_000004.12|:190063426-190092984	29559	94	70	71
+```
+
+生成的 test2.fa.fai 是一个 ​5 列的文本文件，各列含义如下：
+
+​1. 序列名称（如染色体名称 chr1）。
+
+2. 序列总长度（单位为 bp）。
+
+​3. 序列在 FASTA 文件中的起始偏移量（以字节为单位，包括换行符）。
+
+​4. 列：每行的碱基数（最后一行除外）。
+
+​5. 列：每行的总长度（包括换行符，如 Linux 换行符为 \n，占 1 字节）。
+
+# Seed
+使用以下命令行，
+```bash
+for j in `seq 0 $((numchrs - 1))`; do # reference
+	for i in `seq $j $((numchrs - 1))`; do # query; query < reference
+		for m in n y ; do
+			[ "$m" == "y" ] && rc="-r" || rc="";
+			echo "${TIME} -f'TIMING: %e %M' sedef search -k 12 -w 16 ${rc} ${input} -t $i $j >${output}/seeds/${i}_${j}_${m}.bed 2>${output}/log/seeds/${i}_${j}_${m}.log"
+		done
+	done
+done | tee "${output}/seeds.comm" | ${TIME} -f'Seeding time: %E' parallel --will-cite -j ${jobs} --bar --joblog "${output}/seeds.joblog"
+```
+
+# chaining
+chaining的过程是，首先需要生成一些anchors，生成anchors后对这些anchors进行dp连接
+
+## dp
+首先把区间q的端点`[q, q+l-1]`存进xs里，然后按坐标排序，建一颗线段树。
+
+排好序后开始dp，从小到大枚举区间r的端点`r+l-1`，假设当前枚举的坐标为i，则查询$[i-gap, i-1]$区间的最大值
+。
+
+假设查询的最大值的位置为j，那么考虑更新dp值：
+$$dp_i=dp_j+w-gap$$
+其中$w=SCORE \cdot a.has_u +
+              \frac{SCORE}{2} * (a.l - a.has_u)$
+
+$gap = a_q - (p_q + p_l) + a_r - (p_r + p_l)$
+
+求出所有dp值后，对dp值进行排序，然后backtrace一下，标记路径上访问的节点，不能重复访问。
+这样收集了一个path，把所有backtrace获得的path都收集起来。
+
+然后开始对这些路径进行一些筛选：求出最大的区域$span=max(rhi - rlo, qhi - qlo)$，如果$span < 750$，或者所有区域都被masked了，则跳过。
+否则将匹配收集起来：`Hit a{query_ptr, qlo, qhi, ref_ptr, rlo, rhi, up}`。
+
+收集好后，开始进行refine，对收集的hit进行再次挑选
+- 首先看两个区间的相交区域： `qo = max(0, min(orig.query_start + qhi, orig.ref_start + rhi) - max(orig.query_start + qlo, orig.ref_start + rlo))`
+- 然后计算两个区间的非重叠长度`rhi - rlo - qo`和`qhi - qlo - qo`，如果两个非重叠区域的大小都小于500，那么跳过
+- 然后枚举所有前驱anchor，然后先比较一下两个anchor的端点，如果前驱锚点结束位置超出当前锚点结束位置，或者前驱锚点起始位置在当前锚点之后，就跳过
+- 然后过滤gap，如果gap过大也过滤掉，如果两个anchor的gap>=10000，也跳过
+- 如果两个anchor的gap有重叠，也过滤掉
+- 然后计算一下连接的得分，大概是`dp[i]=dp[j]+score-miss-gap`
+- dp之后，再像之前一样进行一次backtrace
+- 然后开始合并alignment的结果，扫描backtrace获取的所有path的锚点，枚举相邻两个，如果相邻两个锚点相交，那么把他们的alignment结果进行合并，使用merge
+  - merge的大概流程是，假设后面的anchor为b，前面的anchor为a，首先修剪b的结尾和a的开头
+  - 然后考虑两个anchor之间的gap，如果gap<=1000，那么把两个gap进行alignment，然后把alignment的结果换成CIGAR放在最后，如果gap>1000，则直接考虑两种情况，一种是把gap填成gap，另一种是填成mismatch，然后把这两种情况分别做alignment，再比较错误率，选择错误率较小的方法填进去
+  - 最后再合并字符串，把a、gap、b加起来
+  - 最后再重新求一遍align_a和align_b和error
