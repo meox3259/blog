@@ -10,3 +10,7 @@ title: meox3259
 
 待阅读源码
 - 继续阅读rocksdb
+
+- I/O子系统
+- rocksdb深入学习
+- 分布式协议：Raft深入学习

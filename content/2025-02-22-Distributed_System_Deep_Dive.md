@@ -1,5 +1,5 @@
 ---
-title: 分布式系统基础（一）
+title: 分布式系统基础 - 基本概念
 draft: false
 tags:
   - 分布式存储

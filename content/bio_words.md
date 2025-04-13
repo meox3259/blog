@@ -1,5 +1,5 @@
 ---
-title: Valgrind简单使用方法
+title: 生物信息的术语
 draft: false
 tags:
   - 生物信息
