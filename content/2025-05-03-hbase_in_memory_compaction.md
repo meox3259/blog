@@ -573,6 +573,40 @@ private boolean refillKVS() {
   }
 ```
 
+看如何新建一个`Segment`，这里关注`CellArrayImmutableSegment`是如何实现的
+```java
+  private ImmutableSegment createImmutableSegment(final Configuration conf,
+    final CellComparator comparator, MemStoreSegmentsIterator iterator, MemStoreLAB memStoreLAB,
+    int numOfCells, MemStoreCompactionStrategy.Action action,
+    CompactingMemStore.IndexType idxType) {
+
+    ImmutableSegment res = null;
+    switch (idxType) {
+      case CHUNK_MAP:
+        res = new CellChunkImmutableSegment(comparator, iterator, memStoreLAB, numOfCells, action);
+        break;
+      case CSLM_MAP:
+        assert false; // non-flat segment can not be created here
+        break;
+      case ARRAY_MAP:
+        res = new CellArrayImmutableSegment(comparator, iterator, memStoreLAB, numOfCells, action);
+        break;
+    }
+    return res;
+  }
+```
+
+调用构造函数
+```java
+  protected CellArrayImmutableSegment(CellComparator comparator, MemStoreSegmentsIterator iterator,
+    MemStoreLAB memStoreLAB, int numOfCells, MemStoreCompactionStrategy.Action action) {
+    super(null, comparator, memStoreLAB); // initiailize the CellSet with NULL
+    incMemStoreSize(0, DEEP_OVERHEAD_CAM, 0, 0); // CAM is always on-heap
+    // build the new CellSet based on CellArrayMap and update the CellSet of the new Segment
+    initializeCellSet(numOfCells, iterator, action);
+  }
+```
+
 新建完之后，自然希望把这个`ImmutableSegment`替换当前的`ImmutableSegment`，拿着给的`result`进行填充
 ```java
 if (!isInterrupted.get()) {
