@@ -185,3 +185,59 @@ impl MemTableIterator {
     }
 }
 ```
+
+# 迭代器
+核心在于需要对于每个迭代器实现以下接口
+
+```rust
+pub trait KeyValueIterator: Send + Sync {
+    /// Returns the next non-deleted key-value pair in the iterator.
+    async fn next(&mut self) -> Result<Option<KeyValue>, SlateDBError> {
+        loop {
+            let entry = self.next_entry().await?;
+            if let Some(kv) = entry {
+                match kv.value {
+                    ValueDeletable::Value(v) => {
+                        return Ok(Some(KeyValue {
+                            key: kv.key,
+                            value: v,
+                        }))
+                    }
+                    ValueDeletable::Merge(_) => todo!(),
+                    ValueDeletable::Tombstone => continue,
+                }
+            } else {
+                return Ok(None);
+            }
+        }
+    }
+
+    /// Returns the next entry in the iterator, which may be a key-value pair or
+    /// a tombstone of a deleted key-value pair.
+    async fn next_entry(&mut self) -> Result<Option<RowEntry>, SlateDBError>;
+
+    /// Seek to the next (inclusive) key
+    async fn seek(&mut self, next_key: &[u8]) -> Result<(), SlateDBError>;
+}
+```
+
+例如`memtable`有以下实现
+```rust
+#[async_trait]
+impl KeyValueIterator for MemTableIterator {
+    async fn next_entry(&mut self) -> Result<Option<RowEntry>, SlateDBError> {
+        Ok(self.next_entry_sync())
+    }
+
+    async fn seek(&mut self, next_key: &[u8]) -> Result<(), SlateDBError> {
+        loop {
+            let front = self.borrow_item().clone();
+            if front.is_some_and(|record| record.key < next_key) {
+                self.next_entry_sync();
+            } else {
+                return Ok(());
+            }
+        }
+    }
+}
+```
