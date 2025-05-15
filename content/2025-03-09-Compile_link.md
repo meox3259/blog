@@ -1,6 +1,6 @@
 ---
 title: 编译->链接
-draft: false
+draft: true
 tags:
   - 操作系统
   - C++
