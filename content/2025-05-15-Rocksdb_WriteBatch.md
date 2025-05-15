@@ -1,4 +1,4 @@
-title: RocksDB - Compaction
+title: RocksDB - WriteBatch
 draft: false
 tags:
   - C++
