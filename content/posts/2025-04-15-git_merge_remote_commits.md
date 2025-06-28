@@ -1,6 +1,7 @@
 ---
 title: 如何将远端git仓库的多个commit合并成一个
 draft: false
+date: 2025-04-15
 tags:
   - git
 ---

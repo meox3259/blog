@@ -1,6 +1,7 @@
 ---
 title: RocksDB - Lethe & Rocksdb中针对delete的优化
 draft: false
+date: 2025-04-13
 tags:
   - C++
   - 分布式存储

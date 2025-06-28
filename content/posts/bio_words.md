@@ -1,6 +1,7 @@
 ---
 title: 生物信息的术语
 draft: false
+date: 2025-04-11
 tags:
   - 生物信息
 ---

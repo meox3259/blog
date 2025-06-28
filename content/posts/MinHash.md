@@ -2,6 +2,7 @@
 title: MinHash
 tags:
   - 生物信息
+date: 2025-04-11
 ---
 
 最小哈希是一种快速估计两个集合相似度的算法。本文来自[Wiki](https://en.wikipedia.org/wiki/MinHash)。
